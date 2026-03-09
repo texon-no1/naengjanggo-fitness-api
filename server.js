@@ -110,6 +110,85 @@ app.post("/api/recipes", async (req, res) => {
     }
 });
 
+// 1주일 식단 생성 API
+app.post("/api/weekly-plan", async (req, res) => {
+    const { goal, style, ingredients } = req.body || {};
+
+    if (!OPENAI_API_KEY) {
+        return res.status(500).json({ error: "OPENAI_API_KEY가 설정되지 않았습니다." });
+    }
+
+    const goalKo = goalToKorean(goal || "diet");
+    const styleKo = styleToKorean(style || "basic");
+
+    const userPrompt = `
+당신은 한국 헬스인(다이어트·근력·유지)을 위한 영양사입니다.
+
+[조건]
+- 목표: ${goalKo} (특히 diet인 경우 저칼로리, 고단백, 포만감 위주 구성)
+- 식단 스타일: ${styleKo}
+- 가용 재료: ${ingredients}
+
+[요청]
+가용 재료를 최대한 활용하여 월요일부터 일요일까지 7일치 식단표를 만들어 주세요. 
+반드시 아침, 점심, 저녁 3끼를 모두 포함해야 합니다.
+
+각 끼니는 "요리명 + 간단한 재료 1~2가지" 형태로 작성하세요. (예: "닭가슴살 샐러드 + 방울토마토")
+
+아래 JSON 객체 형식으로만 응답하세요. 다른 설명은 절대 하지 마세요.
+
+{
+  "plan": [
+    {
+      "day": "월요일",
+      "breakfast": "...",
+      "lunch": "...",
+      "dinner": "..."
+    },
+    ... (일요일까지 총 7개)
+  ]
+}
+  `.trim();
+
+    try {
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${OPENAI_API_KEY}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                model: "gpt-4o-mini",
+                messages: [
+                    { role: "system", content: "You are a professional nutritionist for Korean fitness enthusiasts." },
+                    { role: "user", content: userPrompt }
+                ],
+                temperature: 0.7
+            })
+        });
+
+        if (!response.ok) {
+            const text = await response.text();
+            return res.status(500).json({ error: "OpenAI API 호출 실패", detail: text });
+        }
+
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content ?? "{}";
+
+        let planData = { plan: [] };
+        try {
+            planData = JSON.parse(content);
+        } catch (e) {
+            console.error("JSON 파싱 실패:", e, content);
+        }
+
+        res.json(planData);
+    } catch (err) {
+        console.error("서버 에러:", err);
+        res.status(500).json({ error: "서버 내부 오류" });
+    }
+});
+
 // 간단한 헬스 체크용 엔드포인트
 app.get("/", (req, res) => {
     res.send("냉장고 피트니스 API 서버 작동 중입니다.");
