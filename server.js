@@ -142,8 +142,11 @@ app.post("/api/weekly-plan", async (req, res) => {
     {
       "day": "월요일",
       "breakfast": "...",
+      "breakfast_ingredients": ["재료1 100g", "재료2 1개"],
       "lunch": "...",
-      "dinner": "..."
+      "lunch_ingredients": ["재료3 150g", "재료4 2큰술"],
+      "dinner": "...",
+      "dinner_ingredients": ["재료5 200g", "재료6 약간"]
     },
     ... (일요일까지 총 7개)
   ]
